@@ -8,9 +8,11 @@ local lastClickTime = 0
 local doubleClickThreshold = 0.3
 local gravityActive = false
 local gravityTarget = nil
+local maxParts = 50 -- Limit the number of parts affected.
 
 local function findUnanchoredParts()
     unanchoredParts = {}
+    local count = 0
     for _, part in pairs(workspace:GetDescendants()) do
         if part:IsA("BasePart") and not part.Anchored then
             local parent = part.Parent
@@ -24,6 +26,8 @@ local function findUnanchoredParts()
             end
             if not isPlayerPart then
                 table.insert(unanchoredParts, part)
+                count = count +1
+                if count >= maxParts then break end
             end
         end
     end
@@ -36,13 +40,16 @@ local function applyGravity(position)
         local gravityForce = gravityDirection * gravityStrength
         local repulsionForce = Vector3.new(0, 0, 0)
 
-        for j, otherPart in ipairs(unanchoredParts) do
-            if i ~= j then
-                local distance = (part.Position - otherPart.Position).Magnitude
-                if distance < 5 then
-                    local repulsionDirection = (part.Position - otherPart.Position).Unit
-                    repulsionForce = repulsionForce + repulsionDirection * (repulsionStrength / (distance + 0.1))
-                end
+        -- Optimized repulsion calculation
+        for j = i + 1, #unanchoredParts do
+            local otherPart = unanchoredParts[j]
+            local distance = (part.Position - otherPart.Position).Magnitude
+            if distance < 5 then
+                local repulsionDirection = (part.Position - otherPart.Position).Unit
+                local force = repulsionDirection * (repulsionStrength / (distance + 0.1))
+                repulsionForce = repulsionForce + force
+                local otherRepulsion = force * -1;
+                if otherPart:FindFirstChild("BodyVelocity") then otherPart.BodyVelocity.Velocity = otherPart.BodyVelocity.Velocity + otherRepulsion else local otherBodyVelocity = Instance.new("BodyVelocity") otherBodyVelocity.Velocity = otherRepulsion otherBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge) otherBodyVelocity.Parent = otherPart end
             end
         end
 
